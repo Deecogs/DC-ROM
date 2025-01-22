@@ -19,7 +19,7 @@ class ExerciseHandler:
         if self.exercise_name == "hawkins":
             self.exercise_test = HawkinsTest(self.pose_detector, self.visualizer)
         elif self.exercise_name == "lowerback":
-            self.exercise_test = LowerBackFlexionTest()
+            self.exercise_test = LowerBackFlexionTest(self.pose_detector, self.visualizer)
         else:
             raise ValueError(f"Unsupported exercise: {exercise_name}")
 

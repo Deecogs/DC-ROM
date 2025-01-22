@@ -1,106 +1,170 @@
+import math
 import cv2
-import mediapipe as mp
 import numpy as np
 
 class LowerBackFlexionTest:
-    def __init__(self):
-        self.mp_pose = mp.solutions.pose
-        self.pose = self.mp_pose.Pose()
-        self.roi = (0, 0, 2400, 3600)  # Example ROI, can be customized
-
-    def _diamond_display(self, img, points):
-        """Draw diamonds and connections on the key points."""
-        offset = 3
-        for point in points.values():
-            x, y = point
-            img = cv2.rectangle(img, (int(x - offset), int(y - offset)),
-                                (int(x + offset), int(y + offset)), (255, 255, 255), -1)
-
-        connections = [
-            ("hip", "knee"), ("knee", "ankle"), ("shoulder", "hip"),
+    def __init__(self, pose_detector, visualizer):
+        self.pose_detector = pose_detector
+        self.visualizer = visualizer
+        self.ready_time = 0  # Counter for how long the person has been in ready position
+        self.required_ready_time = 20  # Frames required in ready position before starting
+        self.is_ready = False
+        self.key_points = [
+            11,  # Left shoulder
+            12,  # Right shoulder
+            23,  # Left hip
+            24,  # Right hip
+            25,  # Left knee
+            26,  # Right knee
+            27,  # Left ankle
+            28   # Right ankle
         ]
-        for start, end in connections:
-            x1, y1 = points[start]
-            x2, y2 = points[end]
-            img = cv2.line(img, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
-        return img
-
-    @staticmethod
-    def _calculate_angle(a, b, c):
+        
+    def calculate_angle(self, p1, p2, p3):
         """Calculate angle between three points."""
-        a = np.array(a)
-        b = np.array(b)
-        c = np.array(c)
-        ba = a - b
-        bc = c - b
-        cosine_angle = np.dot(ba, bc) / (np.linalg.norm(ba) * np.linalg.norm(bc))
-        return np.degrees(np.arccos(cosine_angle))
+        angle = math.degrees(math.atan2(p3[1]-p2[1], p3[0]-p2[0]) - 
+                           math.atan2(p1[1]-p2[1], p1[0]-p2[0]))
+        return angle + 360 if angle < 0 else angle
 
-    def process_frame(self, frame):
-        """Process the frame for lower back flexion test analysis."""
+    def check_initial_position(self, frame, coords):
+        """
+        Check if the person is in the correct starting position.
+        Returns: (bool, str) - (is_position_valid, message)
+        """
         h, w, _ = frame.shape
+        messages = []
+        is_valid = True
 
-        # Convert the frame for Mediapipe processing
-        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        results = self.pose.process(rgb_frame)
+        # Check if all required points are detected
+        for point in self.key_points:
+            if point not in coords:
+                return False, "Cannot detect full body. Please step back."
 
-        if results.pose_landmarks:
-            landmarks = results.pose_landmarks.landmark
-            key_points = {
-                "shoulder": (
-                    (landmarks[self.mp_pose.PoseLandmark.LEFT_SHOULDER.value].x +
-                     landmarks[self.mp_pose.PoseLandmark.RIGHT_SHOULDER.value].x) * w / 2,
-                    (landmarks[self.mp_pose.PoseLandmark.LEFT_SHOULDER.value].y +
-                     landmarks[self.mp_pose.PoseLandmark.RIGHT_SHOULDER.value].y) * h / 2
-                ),
-                "hip": (
-                    landmarks[self.mp_pose.PoseLandmark.LEFT_HIP.value].x * w,
-                    landmarks[self.mp_pose.PoseLandmark.LEFT_HIP.value].y * h
-                ),
-                "knee": (
-                    landmarks[self.mp_pose.PoseLandmark.LEFT_KNEE.value].x * w,
-                    landmarks[self.mp_pose.PoseLandmark.LEFT_KNEE.value].y * h
-                ),
-                "ankle": (
-                    landmarks[self.mp_pose.PoseLandmark.LEFT_ANKLE.value].x * w,
-                    landmarks[self.mp_pose.PoseLandmark.LEFT_ANKLE.value].y * h
-                )
-            }
+        # Check if person is facing the camera (using shoulder width)
+        left_shoulder = coords[11]
+        right_shoulder = coords[12]
+        shoulder_width = abs(left_shoulder[0] - right_shoulder[0])
+        if shoulder_width < w * 0.15:  # Minimum width threshold
+            messages.append("Turn to face the camera")
+            is_valid = False
 
-            # Draw diamonds and connections
-            frame = self._diamond_display(frame, key_points)
+        # Check if person is too close or too far
+        body_height = abs(coords[11][1] - coords[27][1])  # shoulder to ankle
+        if body_height < h * 0.5:
+            messages.append("Step closer to the camera")
+            is_valid = False
+        elif body_height > h * 0.9:
+            messages.append("Step back from the camera")
+            is_valid = False
 
-            # Calculate knee angle
-            left_knee_angle = self._calculate_angle(
-                [key_points["hip"][0], key_points["hip"][1]],
-                [key_points["knee"][0], key_points["knee"][1]],
-                [key_points["ankle"][0], key_points["ankle"][1]],
-            )
-            cv2.putText(frame, f"Knee Angle: {int(left_knee_angle)}",
-                        (50, 150), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+        # Check if person is centered
+        center_x = (left_shoulder[0] + right_shoulder[0]) / 2
+        if center_x < w * 0.3:
+            messages.append("Move right")
+            is_valid = False
+        elif center_x > w * 0.7:
+            messages.append("Move left")
+            is_valid = False
 
-            if left_knee_angle < 160:
-                cv2.putText(frame, "Warning: Your knees are bending! Keep them straight.",
-                            (50, 250), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3)
+        # Check if person is standing straight
+        left_hip = coords[23]
+        right_hip = coords[24]
+        hip_angle = self.calculate_angle(left_shoulder, 
+                                       ((left_hip[0] + right_hip[0])/2, (left_hip[1] + right_hip[1])/2),
+                                       right_shoulder)
+        if not (85 <= hip_angle <= 95):
+            messages.append("Stand straight")
+            is_valid = False
+
+        message = " | ".join(messages) if messages else "Good starting position"
+        return is_valid, message
+
+    def draw_pose_guidance(self, frame, message):
+        """Draw guidance overlay on frame."""
+        h, w, _ = frame.shape
+        
+        # Draw semi-transparent overlay
+        overlay = frame.copy()
+        cv2.rectangle(overlay, (0, h-100), (w, h), (0, 0, 0), -1)
+        cv2.addWeighted(overlay, 0.5, frame, 0.5, 0, frame)
+        
+        # Draw guidance text
+        self.visualizer.put_text(
+            frame,
+            "Position Guide: " + message,
+            (20, h-60),
+            color='white',
+            scale=1.0
+        )
+        
+        # Draw progress bar if in correct position
+        if self.ready_time > 0:
+            progress = (self.ready_time / self.required_ready_time) * (w - 40)
+            cv2.rectangle(frame, (20, h-30), (w-20, h-20), (255, 255, 255), 2)
+            cv2.rectangle(frame, (20, h-30), (int(20 + progress), h-20), (0, 255, 0), -1)
+            
         return frame
 
-    def analyze_video(self, video_path, output_path):
-        """Analyze the video and save annotated output."""
-        cap = cv2.VideoCapture(video_path)
-        frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-        frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        fps = cap.get(cv2.CAP_PROP_FPS)
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        out = cv2.VideoWriter(output_path, fourcc, fps, (frame_width, frame_height))
+    def process_frame(self, frame):
+        """Process a single frame for Lower Back Flexion test."""
+        landmarks = self.pose_detector.find_pose(frame)
+        
+        if not landmarks:
+            return frame, {"error": "No pose detected"}
+            
+        coords = self.pose_detector.get_landmark_coordinates(frame, landmarks)
+        
+        # First check initial position
+        is_valid_position, guidance_message = self.check_initial_position(frame, coords)
+        
+        # Update ready state
+        if is_valid_position:
+            self.ready_time += 1
+            if self.ready_time >= self.required_ready_time:
+                self.is_ready = True
+        else:
+            self.ready_time = 0
+            self.is_ready = False
 
-        while cap.isOpened():
-            ret, frame = cap.read()
-            if not ret:
-                break
-
-            # Analyze the frame
-            annotated_frame = self.process_frame(frame)
-            out.write(annotated_frame)
-
-        cap.release()
-        out.release()
+        # Draw position guidance
+        frame = self.draw_pose_guidance(frame, guidance_message)
+        
+        # Get relevant landmarks for Lower Back Flexion
+        shoulder = coords[11]  # Left shoulder
+        hip = coords[23]      # Left hip
+        knee = coords[25]     # Left knee
+        
+        # Calculate trunk angle
+        trunk_angle = self.calculate_angle(shoulder, hip, knee)
+        
+        # Visualize landmarks and angles
+        self.visualizer.draw_landmark_point(frame, shoulder[0], shoulder[1], 'white')
+        self.visualizer.draw_landmark_point(frame, hip[0], hip[1], 'white')
+        self.visualizer.draw_landmark_point(frame, knee[0], knee[1], 'white')
+        
+        self.visualizer.draw_angle(frame, shoulder, hip, knee, trunk_angle)
+        
+        # Add feedback based on trunk angle
+        posture_message = ""
+        if self.is_ready:
+            if 80 <= trunk_angle <= 100:
+                posture_message = "Good posture"
+                self.visualizer.put_text(frame, posture_message, (10, 60), color='green')
+            else:
+                posture_message = "Adjust posture"
+                self.visualizer.put_text(frame, posture_message, (10, 60), color='red')
+            
+        rom_data = {
+            "test": "lower_back_flexion",
+            "is_ready": self.is_ready,
+            "trunk_angle": trunk_angle,
+            "position_valid": is_valid_position,
+            "guidance": guidance_message,
+            "posture_message": posture_message,
+            "ready_progress": (self.ready_time / self.required_ready_time) * 100,
+            "shoulder_position": (shoulder[0], shoulder[1]),
+            "hip_position": (hip[0], hip[1]),
+            "knee_position": (knee[0], knee[1])
+        }
+        
+        return frame, rom_data
