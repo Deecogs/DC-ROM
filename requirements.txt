@@ -4,3 +4,7 @@ numpy==1.21.5
 opencv-python==4.6.0.66
 Pillow==9.0.1
 pytest
+fastapi
+uvicorn
+opencv-python-headless
+numpy
