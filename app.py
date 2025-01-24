@@ -157,7 +157,7 @@ async def root():
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
-    exercise_handler = ExerciseHandler("lowerback")  # Initialize the exercise handler
+    exercise_handler = ExerciseHandler("lowerback")  # Initialize the exercise handler lowerback hawkins
     # llm_api_url = "http://llm-api-endpoint/rom"  # Replace with your actual LLM API URL
     llm_api_url =""
     async with httpx.AsyncClient() as client:  # Create an HTTP client session
@@ -212,3 +212,5 @@ async def websocket_endpoint(websocket: WebSocket):
 
 if __name__ == "__main__":
     uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)
+
+# uvicorn app:app --reload --host 0.0.0.0 --port 8000
