@@ -154,7 +154,7 @@ async def root():
 #             await websocket.close()
 
 
-@app.websocket("/ws")
+@app.websocket("/process_frame")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     exercise_handler = ExerciseHandler("lowerback")  # Initialize the exercise handler lowerback hawkins
