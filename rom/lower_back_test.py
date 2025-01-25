@@ -181,6 +181,7 @@ class LowerBackFlexionTest:
             "test": "lower_back_flexion",
             "is_ready": self.is_ready,
             "trunk_angle": trunk_angle,
+            "ROM": [90, 180],
             "position_valid": is_valid_position,
             "guidance": guidance_message,
             "posture_message": posture_message,
