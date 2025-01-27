@@ -6,7 +6,7 @@ import cv2
 import numpy as np
 import json
 from exercise_handler import ExerciseHandler
-import httpx  # Add this for HTTP requests
+import httpx  # For HTTP requests
 
 app = FastAPI(
     title="ROM Calculator API with WebSocket",
@@ -14,7 +14,6 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Updated HTML content with ROM data display
 html_content = """
 <!DOCTYPE html>
 <html lang="en">
@@ -61,7 +60,7 @@ html_content = """
         const canvas = document.getElementById('canvas');
         const romDataElement = document.getElementById('romData');
         const ctx = canvas.getContext('2d');
-        const ws = new WebSocket('ws://localhost:8000/ws');
+        const ws = new WebSocket('ws://localhost:8000/process_frame');
 
         async function initWebcam() {
             try {
@@ -89,26 +88,17 @@ html_content = """
 
         ws.onmessage = (event) => {
             const data = JSON.parse(event.data);
-            
-            // Update the image
             const image = new Image();
             image.onload = () => {
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
                 ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
             };
             image.src = data.image;
-            
-            // Update ROM data display
             romDataElement.textContent = JSON.stringify(data.rom_data, null, 2);
         };
 
-        ws.onerror = (error) => {
-            console.error('WebSocket error:', error);
-        };
-
-        ws.onclose = () => {
-            console.log('WebSocket connection closed');
-        };
+        ws.onerror = (error) => console.error('WebSocket error:', error);
+        ws.onclose = () => console.log('WebSocket connection closed');
 
         initWebcam();
     </script>
@@ -120,97 +110,46 @@ html_content = """
 async def root():
     return HTMLResponse(html_content)
 
-# @app.websocket("/ws")
-# async def websocket_endpoint(websocket: WebSocket):
-#     await websocket.accept()
-#     exercise_handler = ExerciseHandler("lowerback")  # Initialize the exercise handler
-#     try:
-#         while True:
-#             # Receive base64-encoded frame
-#             data = await websocket.receive_text()
-#             image_data = base64.b64decode(data.split(",")[1])
-#             nparr = np.frombuffer(image_data, np.uint8)
-#             frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-
-#             # Process the frame using the selected exercise handler
-#             processed_frame, rom_data = exercise_handler.process_frame(frame)
-
-#             # Encode processed frame
-#             _, buffer = cv2.imencode(".jpg", processed_frame)
-#             frame_b64 = base64.b64encode(buffer).decode("utf-8")
-            
-#             # Create combined response with both image and ROM data
-#             response_data = {
-#                 "image": f"data:image/jpeg;base64,{frame_b64}",
-#                 "rom_data": rom_data
-#             }
-            
-#             # Send combined data as JSON
-#             await websocket.send_text(json.dumps(response_data))
-#     except Exception as e:
-#         print(f"Error: {e}")
-#     finally:
-#         if websocket.client_state.CONNECTED:
-#             await websocket.close()
-
-
 @app.websocket("/process_frame")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
-    exercise_handler = ExerciseHandler("lowerback")  # Initialize the exercise handler lowerback hawkins
-    # llm_api_url = "http://llm-api-endpoint/rom"  # Replace with your actual LLM API URL
-    llm_api_url =""
-    async with httpx.AsyncClient() as client:  # Create an HTTP client session
+    exercise_handler = ExerciseHandler("lowerback")
+    llm_api_url = "http://llm-api-endpoint/rom"  # Replace with actual URL
+
+    async with httpx.AsyncClient() as client:
         try:
             while True:
-                # Receive base64-encoded frame
                 data = await websocket.receive_text()
                 image_data = base64.b64decode(data.split(",")[1])
                 nparr = np.frombuffer(image_data, np.uint8)
                 frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
-                # Process the frame using the selected exercise handler
                 processed_frame, rom_data = exercise_handler.process_frame(frame)
 
-                # Encode processed frame
                 _, buffer = cv2.imencode(".jpg", processed_frame)
                 frame_b64 = base64.b64encode(buffer).decode("utf-8")
 
-                # Initialize LLM API result as a fallback
                 llm_result = {"info": "LLM API is unavailable; only ROM data processed"}
-
-                # Try to send ROM data to LLM API
                 try:
-                    llm_response = await client.post(
-                        llm_api_url,
-                        json={"rom_data": rom_data}
-                    )
+                    llm_response = await client.post(llm_api_url, json={"rom_data": rom_data})
                     if llm_response.status_code == 200:
-                        llm_result = llm_response.json()  # Parse JSON response
-                    else:
-                        print(f"LLM API responded with status {llm_response.status_code}")
+                        llm_result = llm_response.json()
                 except httpx.RequestError as e:
                     print(f"LLM API Request Error: {e}")
                 except Exception as e:
-                    print(f"Unexpected error with LLM API: {e}")
+                    print(f"Unexpected LLM API error: {e}")
 
-                # Create combined response with both image and ROM data
                 response_data = {
-                    "image": f"data:image/jpeg;base64,{frame_b64}",
+                    "image": f"NULL",
                     "rom_data": rom_data,
-                    "llm_result": llm_result,  # Include LLM API results or fallback
+                    "llm_result": llm_result
                 }
-
-                # Send combined data as JSON to WebSocket
                 await websocket.send_text(json.dumps(response_data))
         except Exception as e:
-            print(f"Error: {e}")
+            print(f"WebSocket Error: {e}")
         finally:
             if websocket.client_state.CONNECTED:
                 await websocket.close()
 
-
 if __name__ == "__main__":
     uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)
-
-# uvicorn app:app --reload --host 0.0.0.0 --port 8000

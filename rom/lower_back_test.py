@@ -1,14 +1,18 @@
 import math
 import cv2
 import numpy as np
+from collections import deque
 
 class LowerBackFlexionTest:
-    def __init__(self, pose_detector, visualizer):
+    def __init__(self, pose_detector, visualizer, window_size=100):
         self.pose_detector = pose_detector
         self.visualizer = visualizer
         self.ready_time = 0
         self.required_ready_time = 20
         self.is_ready = False
+        self.angle_buffer = deque(maxlen=window_size)  # Buffer for last N angles
+        self.min_angle = float('inf')  # Initialize with infinity
+        self.max_angle = float('-inf')  # Initialize with negative infinity
         self.key_points = [
             11,  # Left shoulder
             12,  # Right shoulder
@@ -128,6 +132,14 @@ class LowerBackFlexionTest:
 
         return frame
 
+    def update_rom(self, angle):
+        """Update ROM based on a sliding window of the last N angles."""
+        # Add the new angle to the buffer
+        self.angle_buffer.append(angle)
+
+        # Compute the min and max over the buffer
+        self.min_angle = min(self.angle_buffer)
+        self.max_angle = max(self.angle_buffer)
     def process_frame(self, frame):
         """Process a single frame for Lower Back Flexion test."""
         landmarks = self.pose_detector.find_pose(frame)
@@ -160,6 +172,9 @@ class LowerBackFlexionTest:
         # Calculate trunk angle
         trunk_angle = self.calculate_angle(shoulder, hip, knee)
 
+        # Update ROM
+        self.update_rom(trunk_angle)
+
         # Visualize landmarks and angles
         self.visualizer.draw_landmark_point(frame, shoulder[0], shoulder[1], 'white')
         self.visualizer.draw_landmark_point(frame, hip[0], hip[1], 'white')
@@ -181,7 +196,7 @@ class LowerBackFlexionTest:
             "test": "lower_back_flexion",
             "is_ready": self.is_ready,
             "trunk_angle": trunk_angle,
-            "ROM": [90, 180],
+            "ROM": [self.min_angle, self.max_angle],
             "position_valid": is_valid_position,
             "guidance": guidance_message,
             "posture_message": posture_message,
