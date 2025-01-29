@@ -7,11 +7,21 @@ import numpy as np
 import json
 from exercise_handler import ExerciseHandler
 import httpx  # For HTTP requests
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(
     title="ROM Calculator API with WebSocket",
     description="WebSocket API for Range of Motion calculations using pose estimation",
     version="1.0.0"
+)
+
+# Allow all origins, methods, and headers (for development)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Change this to a specific frontend URL in production
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 html_content = """
