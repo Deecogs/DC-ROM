@@ -121,6 +121,11 @@ html_content = """
 async def root():
     return HTMLResponse(html_content)
 
+
+@app.get("/test")
+async def get_data():
+    return {"message": "Success"}
+
 @app.websocket("/process_frame")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
