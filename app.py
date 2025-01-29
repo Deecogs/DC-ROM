@@ -16,12 +16,13 @@ app = FastAPI(
 )
 
 # Allow all origins, methods, and headers (for development)
+# Allow CORS for all origins, methods, and headers (for development)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Change this to a specific frontend URL in production
+    allow_origins=["*"],  # Allows all origins (change this in production)
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["*"],  # Allows all HTTP methods
+    allow_headers=["*"],  # Allows all headers
 )
 
 html_content = """
