@@ -130,42 +130,64 @@ async def get_data():
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     exercise_handler = ExerciseHandler("lowerback")
-    llm_api_url = "http://llm-api-endpoint/rom"  # Replace with actual URL
+    llm_api_url = "http://llm-api-endpoint/rom"  # Replace with actual LLM API URL
 
     async with httpx.AsyncClient() as client:
         try:
             while True:
-                data = await websocket.receive_text()
-                image_data = base64.b64decode(data.split(",")[1])
-                nparr = np.frombuffer(image_data, np.uint8)
-                frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-
-                processed_frame, rom_data = exercise_handler.process_frame(frame)
-
-                _, buffer = cv2.imencode(".jpg", processed_frame)
-                frame_b64 = base64.b64encode(buffer).decode("utf-8")
-
-                llm_result = {"info": "LLM API is unavailable; only ROM data processed"}
                 try:
-                    llm_response = await client.post(llm_api_url, json={"rom_data": rom_data})
-                    if llm_response.status_code == 200:
-                        llm_result = llm_response.json()
-                except httpx.RequestError as e:
-                    print(f"LLM API Request Error: {e}")
+                    data = await websocket.receive_text()
+                    if not data:
+                        break  # Exit loop if no data is received (WebSocket closed)
+                    
+                    # Decode received base64 image
+                    image_data = base64.b64decode(data.split(",")[1])
+                    nparr = np.frombuffer(image_data, np.uint8)
+                    frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+                    # Process frame
+                    processed_frame, rom_data = exercise_handler.process_frame(frame)
+
+                    # Encode processed frame back to base64
+                    _, buffer = cv2.imencode(".jpg", processed_frame)
+                    frame_b64 = base64.b64encode(buffer).decode("utf-8")
+
+                    # Default response for LLM API
+                    llm_result = {"info": "LLM API is unavailable; only ROM data processed"}
+
+                    # Send ROM data to LLM API
+                    try:
+                        llm_response = await client.post(llm_api_url, json={"rom_data": rom_data})
+                        if llm_response.status_code == 200:
+                            llm_result = llm_response.json()
+                    except httpx.RequestError as e:
+                        print(f"LLM API Request Error: {e}")
+                    except Exception as e:
+                        print(f"Unexpected LLM API error: {e}")
+
+                    # Send response
+                    response_data = {
+                        "image": f"data:image/jpeg;base64,{frame_b64}",
+                        "rom_data": rom_data,
+                        "llm_result": llm_result
+                    }
+                    await websocket.send_text(json.dumps(response_data))
+                
+                except WebSocketDisconnect:
+                    print("Client disconnected.")
+                    break  # Exit loop if the client disconnects
+                
                 except Exception as e:
-                    print(f"Unexpected LLM API error: {e}")
-
-                response_data = {
-                    "image": f"NULL",
-                    "rom_data": rom_data,
-                    "llm_result": llm_result
-                }
-                await websocket.send_text(json.dumps(response_data))
+                    print(f"WebSocket Processing Error: {e}")
+        
         except Exception as e:
-            print(f"WebSocket Error: {e}")
-        finally:
-            if websocket.client_state.CONNECTED:
-                await websocket.close()
+            print(f"Unexpected WebSocket Error: {e}")
 
+        finally:
+            try:
+                await websocket.close()
+            except Exception as e:
+                print(f"Error closing WebSocket: {e}")
+                
 if __name__ == "__main__":
     uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)
