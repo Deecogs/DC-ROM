@@ -1,5 +1,6 @@
 import uvicorn
-from fastapi import FastAPI, WebSocket
+
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 import base64
 import cv2
@@ -130,7 +131,7 @@ async def get_data():
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     exercise_handler = ExerciseHandler("lowerback")
-    llm_api_url = "http://llm-api-endpoint/rom"  # Replace with actual LLM API URL
+    # llm_api_url = "http://llm-api-endpoint/rom"  # Replace with actual LLM API URL
 
     async with httpx.AsyncClient() as client:
         try:
@@ -157,9 +158,10 @@ async def websocket_endpoint(websocket: WebSocket):
 
                     # Send ROM data to LLM API
                     try:
-                        llm_response = await client.post(llm_api_url, json={"rom_data": rom_data})
-                        if llm_response.status_code == 200:
-                            llm_result = llm_response.json()
+                        # llm_response = await client.post(llm_api_url, json={"rom_data": rom_data})
+                        # if llm_response.status_code == 200:
+                            # llm_result = llm_response.json()
+                        llm_result = "NULL"
                     except httpx.RequestError as e:
                         print(f"LLM API Request Error: {e}")
                     except Exception as e:
@@ -191,3 +193,4 @@ async def websocket_endpoint(websocket: WebSocket):
                 
 if __name__ == "__main__":
     uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)
+    # uvicorn app:app --reload --host 0.0.0.0 --port 8000

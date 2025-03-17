@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ROM Calculator - Pose Estimation</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            text-align: center;
+        }
+        .controls {
+            margin: 10px;
+        }
+        .video-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100vw;
+            height: 50vh;
+            background-color: black;
+        }
+        video, canvas {
+            width: 50vw;
+            height: auto;
+            max-height: 100%;
+            object-fit: contain;
+            border: 2px solid white;
+            background-color: black;
+        }
+        .data-container {
+            padding: 20px;
+            background-color: #f5f5f5;
+            border-radius: 8px;
+            margin: 10px;
+            text-align: left;
+        }
+        .rom-data {
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        button {
+            margin: 5px;
+            padding: 10px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <h1>ROM Calculator - Pose Estimation</h1>
+
+    <div class="controls">
+        <p>Status: <span id="status">Disconnected ❌</span></p>
+        <button onclick="connectWebSocket()">Connect</button>
+        <button onclick="startVideo()">Start Video</button>
+        <button onclick="stopWebSocket()">Stop WebSocket</button>
+    </div>
+
+    <div class="video-container">
+        <video id="video" autoplay playsinline></video>
+        <canvas id="outputCanvas"></canvas>
+    </div>
+
+    <div class="data-container">
+        <h2>ROM Data</h2>
+        <pre id="romData" class="rom-data">Waiting for data...</pre>
+    </div>
+
+    <script>
+        let video = document.getElementById('video');
+        let outputCanvas = document.getElementById('outputCanvas');
+        let romDataElement = document.getElementById('romData');
+        let statusElement = document.getElementById('status');
+        let ctxOutput = outputCanvas.getContext('2d');
+        let ws = null;
+        let isStreaming = false;
+        let sendInterval = null;
+
+        function connectWebSocket() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                console.log("WebSocket already connected.");
+                return;
+            }
+
+            ws = new WebSocket('ws://localhost:8000/process_frame');
+
+            ws.onopen = () => {
+                console.log("WebSocket Connected.");
+                statusElement.innerHTML = "Connected ✅";
+            };
+
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                const image = new Image();
+                image.onload = () => {
+                    outputCanvas.width = image.width;
+                    outputCanvas.height = image.height;
+                    ctxOutput.clearRect(0, 0, outputCanvas.width, outputCanvas.height);
+                    ctxOutput.drawImage(image, 0, 0, outputCanvas.width, outputCanvas.height);
+                };
+                image.src = data.image;
+                romDataElement.textContent = JSON.stringify(data.rom_data, null, 2);
+            };
+
+            ws.onerror = (error) => {
+                console.error("WebSocket error:", error);
+                statusElement.innerHTML = "Error ⚠️";
+            };
+
+            ws.onclose = () => {
+                console.log("WebSocket Disconnected.");
+                statusElement.innerHTML = "Disconnected ❌";
+            };
+        }
+
+        async function startVideo() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                video.srcObject = stream;
+                isStreaming = true;
+                sendFrames();
+            } catch (err) {
+                console.error("Error accessing webcam:", err);
+            }
+        }
+
+        function sendFrames() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                console.log("WebSocket is not connected.");
+                return;
+            }
+
+            sendInterval = setInterval(() => {
+                if (!isStreaming) return;
+                const canvasTmp = document.createElement('canvas');
+                canvasTmp.width = video.videoWidth;
+                canvasTmp.height = video.videoHeight;
+                const ctxTmp = canvasTmp.getContext('2d');
+                ctxTmp.drawImage(video, 0, 0, canvasTmp.width, canvasTmp.height);
+                const frameData = canvasTmp.toDataURL('image/jpeg');
+                ws.send(frameData);
+            }, 100);
+        }
+
+        function stopWebSocket() {
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+            isStreaming = false;
+            if (sendInterval) clearInterval(sendInterval);
+            console.log("WebSocket stopped.");
+        }
+    </script>
+</body>
+</html>
