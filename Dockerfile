@@ -23,16 +23,23 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Create directory structure
-RUN mkdir -p /app/api /app/rom /app/utils /app/static /app/templates
+RUN mkdir -p /app/api /app/rom /app/utils /app/static /app/templates /app/data
 
 # Copy requirements first for better caching
 COPY requirements.txt .
 
 # Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt && \
-    # Fix permissions for MediaPipe model files
-    find /usr/local/lib/python3.10/site-packages/mediapipe -name "*.tflite" -exec chmod 644 {} \; && \
-    find /usr/local/lib/python3.10/site-packages/mediapipe -type d -exec chmod 755 {} \;
+RUN pip install --no-cache-dir -r requirements.txt
+
+# CRITICAL FIX: Pre-download MediaPipe models and set permissions
+RUN mkdir -p /usr/local/lib/python3.10/site-packages/mediapipe/modules/pose_landmark/ && \
+    chmod 777 /usr/local/lib/python3.10/site-packages/mediapipe/modules/pose_landmark/ && \
+    wget -q -O /usr/local/lib/python3.10/site-packages/mediapipe/modules/pose_landmark/pose_landmark_heavy.tflite \
+    https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_heavy/float16/1/pose_landmarker_heavy.task && \
+    chmod 644 /usr/local/lib/python3.10/site-packages/mediapipe/modules/pose_landmark/pose_landmark_heavy.tflite
+
+# Make MediaPipe model directory writable
+RUN chmod -R 777 /usr/local/lib/python3.10/site-packages/mediapipe/modules/
 
 # Copy application code
 COPY api/ /app/api/
@@ -52,6 +59,10 @@ RUN ln -sf /app/demo.py /usr/local/bin/demo && \
 RUN useradd --create-home appuser && \
     chown -R appuser:appuser /app
 
+# Make sure data directory is writable
+RUN chown -R appuser:appuser /app/data && \
+    chmod -R 755 /app/data
+
 # Switch to non-root user
 USER appuser
 
@@ -60,7 +71,7 @@ EXPOSE 8000
 
 # Set up a health check
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
+  CMD curl -f http://localhost:8000/health || exit 1
 
 # Command to run the application
 CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
