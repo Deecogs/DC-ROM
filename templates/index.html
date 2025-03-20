@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lower Back ROM Analysis</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background-color: #f0f2f5;
+            color: #333;
+        }
+        
+        header {
+            background-color: #2c3e50;
+            color: white;
+            padding: 1rem;
+            text-align: center;
+        }
+        
+        .container {
+            display: flex;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 1rem;
+        }
+        
+        .video-container {
+            flex: 3;
+            min-height: 500px;
+            background-color: #000;
+            position: relative;
+            border-radius: 8px;
+            overflow: hidden;
+            margin-right: 1rem;
+        }
+        
+        .data-panel {
+            flex: 2;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 1rem;
+            max-width: 400px;
+        }
+        
+        .control-panel {
+            background-color: #eaeaea;
+            padding: 1rem;
+            margin: 1rem auto;
+            border-radius: 8px;
+            max-width: 1200px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .btn-group {
+            display: flex;
+            gap: 0.5rem;
+        }
+        
+        button {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        
+        .btn-primary {
+            background-color: #3498db;
+            color: white;
+        }
+        
+        .btn-success {
+            background-color: #2ecc71;
+            color: white;
+        }
+        
+        .btn-danger {
+            background-color: #e74c3c;
+            color: white;
+        }
+        
+        .btn-secondary {
+            background-color: #95a5a6;
+            color: white;
+        }
+        
+        button:hover {
+            opacity: 0.9;
+        }
+        
+        button:disabled {
+            background-color: #bdc3c7;
+            cursor: not-allowed;
+        }
+        
+        video, canvas {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+        
+        .status-indicator {
+            display: flex;
+            align-items: center;
+        }
+        
+        .indicator-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .status-connected {
+            background-color: #2ecc71;
+        }
+        
+        .status-disconnected {
+            background-color: #e74c3c;
+        }
+        
+        .status-processing {
+            background-color: #f39c12;
+        }
+        
+        h2, h3 {
+            margin-bottom: 1rem;
+            color: #2c3e50;
+        }
+        
+        .data-card {
+            background-color: #f8f9fa;
+            border-radius: 6px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+        
+        .data-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+        }
+        
+        .data-row label {
+            font-weight: 500;
+            color: #7f8c8d;
+        }
+        
+        .data-row span {
+            font-weight: 600;
+        }
+        
+        .rom-gauge {
+            height: 20px;
+            background-color: #ecf0f1;
+            border-radius: 10px;
+            margin: 1rem 0;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .rom-fill {
+            position: absolute;
+            height: 100%;
+            background: linear-gradient(90deg, #3498db, #2ecc71);
+            border-radius: 10px;
+            transition: width 0.5s ease;
+        }
+        
+        .rom-markers {
+            position: relative;
+            height: 24px;
+            margin-bottom: 0.5rem;
+        }
+        
+        .rom-marker {
+            position: absolute;
+            top: 0;
+            width: 2px;
+            height: 10px;
+            background-color: #7f8c8d;
+        }
+        
+        .rom-label {
+            position: absolute;
+            top: 12px;
+            transform: translateX(-50%);
+            font-size: 12px;
+            color: #7f8c8d;
+        }
+        
+        .current-angle {
+            font-size: 2rem;
+            font-weight: 700;
+            text-align: center;
+            margin: 1rem 0;
+            color: #2980b9;
+        }
+        
+        .progress-bar {
+            height: 10px;
+            background-color: #ecf0f1;
+            border-radius: 5px;
+            margin-top: 0.5rem;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background-color: #3498db;
+            border-radius: 5px;
+            transition: width 0.3s ease;
+        }
+        
+        .guidance-message {
+            padding: 0.7rem;
+            background-color: #eef7fb;
+            border-left: 4px solid #3498db;
+            margin: 1rem 0;
+            font-size: 0.9rem;
+        }
+        
+        .results-container {
+            background-color: #e8f6f3;
+            padding: 1rem;
+            border-radius: 6px;
+            margin-top: 1rem;
+            border: 1px solid #a3e4d7;
+            display: none;
+        }
+        
+        .results-title {
+            color: #16a085;
+            margin-bottom: 0.7rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .timer {
+            margin-left: 1rem;
+            font-size: 0.9rem;
+            color: #7f8c8d;
+        }
+        
+        .final-result {
+            font-size: 1.5rem;
+            font-weight: 700;
+            text-align: center;
+            margin: 1rem 0;
+            color: #16a085;
+        }
+        
+        .raw-data {
+            font-family: monospace;
+            font-size: 12px;
+            background-color: #2c3e50;
+            color: #ecf0f1;
+            padding: 1rem;
+            border-radius: 6px;
+            max-height: 200px;
+            overflow-y: auto;
+            margin-top: 1rem;
+        }
+        
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Lower Back Range of Motion Analysis</h1>
+    </header>
+    
+    <div class="control-panel">
+        <div class="status-indicator">
+            <div class="indicator-dot status-disconnected" id="statusDot"></div>
+            <span id="statusText">Disconnected</span>
+        </div>
+        
+        <div class="btn-group">
+            <button id="connectBtn" class="btn-primary">Connect</button>
+            <button id="startBtn" class="btn-success" disabled>Start Camera</button>
+            <button id="analyzeBtn" class="btn-secondary" disabled>Begin Analysis</button>
+            <button id="stopBtn" class="btn-danger" disabled>Stop</button>
+        </div>
+    </div>
+    
+    <div class="container">
+        <div class="video-container">
+            <video id="videoElement" autoplay playsinline></video>
+            <canvas id="outputCanvas"></canvas>
+        </div>
+        
+        <div class="data-panel">
+            <h2>Real-time Analysis</h2>
+            
+            <div class="data-card">
+                <h3>Current Position</h3>
+                <div class="data-row">
+                    <label>Status:</label>
+                    <span id="readyStatus">Not Ready</span>
+                </div>
+                
+                <div class="guidance-message" id="guidanceMessage">
+                    Please stand facing the camera
+                </div>
+                
+                <div class="data-row">
+                    <label>Readiness:</label>
+                    <span id="readyProgress">0%</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="readyProgressBar" style="width: 0%"></div>
+                </div>
+            </div>
+            
+            <div class="data-card">
+                <h3>Trunk Angle</h3>
+                <div class="current-angle" id="currentAngle">0.0°</div>
+                
+                <div class="rom-markers">
+                    <div class="rom-marker" style="left: 0%"></div>
+                    <div class="rom-marker" style="left: 25%"></div>
+                    <div class="rom-marker" style="left: 50%"></div>
+                    <div class="rom-marker" style="left: 75%"></div>
+                    <div class="rom-marker" style="left: 100%"></div>
+                    
+                    <div class="rom-label" style="left: 0%">0°</div>
+                    <div class="rom-label" style="left: 25%">45°</div>
+                    <div class="rom-label" style="left: 50%">90°</div>
+                    <div class="rom-label" style="left: 75%">135°</div>
+                    <div class="rom-label" style="left: 100%">180°</div>
+                </div>
+                
+                <div class="rom-gauge">
+                    <div class="rom-fill" id="angleGauge" style="width: 0%"></div>
+                </div>
+                
+                <div class="data-row">
+                    <label>Min Angle:</label>
+                    <span id="minAngle">--°</span>
+                </div>
+                <div class="data-row">
+                    <label>Max Angle:</label>
+                    <span id="maxAngle">--°</span>
+                </div>
+                <div class="data-row">
+                    <label>ROM Range:</label>
+                    <span id="romRange">--°</span>
+                </div>
+            </div>
+            
+            <div class="results-container" id="resultsContainer">
+                <div class="results-title">
+                    <h3>Final Results</h3>
+                    <span class="timer" id="resultTimer">00:00</span>
+                </div>
+                
+                <div class="final-result" id="finalResult">--</div>
+                
+                <div class="data-row">
+                    <label>Stable Min Angle:</label>
+                    <span id="stableMinAngle">--°</span>
+                </div>
+                <div class="data-row">
+                    <label>Stable Max Angle:</label>
+                    <span id="stableMaxAngle">--°</span>
+                </div>
+                <div class="data-row">
+                    <label>Stable ROM Range:</label>
+                    <span id="stableRomRange">--°</span>
+                </div>
+            </div>
+            
+            <div class="raw-data" id="rawData">
+                Waiting for data...
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // DOM Elements
+        const videoElement = document.getElementById('videoElement');
+        const outputCanvas = document.getElementById('outputCanvas');
+        const statusDot = document.getElementById('statusDot');
+        const statusText = document.getElementById('statusText');
+        const connectBtn = document.getElementById('connectBtn');
+        const startBtn = document.getElementById('startBtn');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const readyStatus = document.getElementById('readyStatus');
+        const guidanceMessage = document.getElementById('guidanceMessage');
+        const readyProgress = document.getElementById('readyProgress');
+        const readyProgressBar = document.getElementById('readyProgressBar');
+        const currentAngle = document.getElementById('currentAngle');
+        const angleGauge = document.getElementById('angleGauge');
+        const minAngle = document.getElementById('minAngle');
+        const maxAngle = document.getElementById('maxAngle');
+        const romRange = document.getElementById('romRange');
+        const rawData = document.getElementById('rawData');
+        const resultsContainer = document.getElementById('resultsContainer');
+        const resultTimer = document.getElementById('resultTimer');
+        const finalResult = document.getElementById('finalResult');
+        const stableMinAngle = document.getElementById('stableMinAngle');
+        const stableMaxAngle = document.getElementById('stableMaxAngle');
+        const stableRomRange = document.getElementById('stableRomRange');
+        
+        // Canvas context
+        const ctx = outputCanvas.getContext('2d');
+        
+        // WebSocket and stream variables
+        let ws = null;
+        let mediaStream = null;
+        let isAnalyzing = false;
+        let sendInterval = null;
+        let clientId = 'client_' + Math.random().toString(36).substring(2, 15);
+        let startTime = null;
+        let finalizationTimer = null;
+        
+        // ROM tracking
+        let romBuffer = {
+            minAngle: 180,
+            maxAngle: 0
+        };
+        
+        // Set initial state
+        videoElement.style.display = 'none';
+        outputCanvas.style.display = 'none';
+        
+        // Function to update status display
+        function updateStatus(status) {
+            switch (status) {
+                case 'connected':
+                    statusDot.className = 'indicator-dot status-connected';
+                    statusText.textContent = 'Connected';
+                    connectBtn.disabled = true;
+                    startBtn.disabled = false;
+                    break;
+                    
+                case 'disconnected':
+                    statusDot.className = 'indicator-dot status-disconnected';
+                    statusText.textContent = 'Disconnected';
+                    connectBtn.disabled = false;
+                    startBtn.disabled = true;
+                    analyzeBtn.disabled = true;
+                    stopBtn.disabled = true;
+                    break;
+                    
+                case 'analyzing':
+                    statusDot.className = 'indicator-dot status-processing';
+                    statusText.textContent = 'Analyzing';
+                    startBtn.disabled = true;
+                    analyzeBtn.disabled = true;
+                    stopBtn.disabled = false;
+                    break;
+                    
+                case 'ready':
+                    statusDot.className = 'indicator-dot status-connected';
+                    statusText.textContent = 'Camera Ready';
+                    startBtn.disabled = true;
+                    analyzeBtn.disabled = false;
+                    stopBtn.disabled = false;
+                    break;
+            }
+        }
+        
+        // Connect to WebSocket
+        function connectWebSocket() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                console.log("WebSocket already connected");
+                return;
+            }
+            
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            // Adjust the URL based on your server configuration
+            const wsUrl = `${protocol}//${window.location.host}/ws/process-frames/${clientId}?test_type=lowerback`;
+            
+            ws = new WebSocket(wsUrl);
+            
+            ws.onopen = () => {
+                console.log("WebSocket connected");
+                updateStatus('connected');
+            };
+            
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    
+                    if (data.status === 'error') {
+                        console.error("Server error:", data.error);
+                        return;
+                    }
+                    
+                    if (data.image && data.rom_data) {
+                        // Display the processed image
+                        const image = new Image();
+                        image.onload = () => {
+                            outputCanvas.width = image.width;
+                            outputCanvas.height = image.height;
+                            ctx.clearRect(0, 0, outputCanvas.width, outputCanvas.height);
+                            ctx.drawImage(image, 0, 0);
+                        };
+                        image.src = data.image;
+                        
+                        // Update raw data display
+                        rawData.textContent = JSON.stringify(data.rom_data, null, 2);
+                        
+                        // Update UI with ROM data
+                        updateROMDisplay(data.rom_data);
+                    }
+                } catch (error) {
+                    console.error("Error processing WebSocket message:", error);
+                }
+            };
+            
+            ws.onerror = (error) => {
+                console.error("WebSocket error:", error);
+                updateStatus('disconnected');
+            };
+            
+            ws.onclose = () => {
+                console.log("WebSocket closed");
+                updateStatus('disconnected');
+                stopAnalysis();
+            };
+        }
+        
+        // Update ROM display with data from server
+        function updateROMDisplay(romData) {
+            // Update ready status
+            if (romData.is_ready) {
+                readyStatus.textContent = "Ready";
+                readyStatus.style.color = "#27ae60";
+            } else {
+                readyStatus.textContent = "Not Ready";
+                readyStatus.style.color = "#e74c3c";
+            }
+            
+            // Update guidance
+            guidanceMessage.textContent = romData.guidance || "Stand facing the camera";
+            
+            // Update ready progress
+            const progress = romData.ready_progress || 0;
+            readyProgress.textContent = `${Math.round(progress)}%`;
+            readyProgressBar.style.width = `${progress}%`;
+            
+            // Update current angle
+            const trunkAngle = romData.trunk_angle || 0;
+            currentAngle.textContent = `${trunkAngle.toFixed(1)}°`;
+            
+            // Update angle gauge (scale to 0-180 degrees)
+            const gaugePercentage = (trunkAngle / 180) * 100;
+            angleGauge.style.width = `${Math.min(gaugePercentage, 100)}%`;
+            
+            // Update ROM values
+            if (romData.ROM && romData.ROM.length >= 2) {
+                const min = romData.ROM[0];
+                const max = romData.ROM[1];
+                const range = romData.rom_range || (max - min);
+                
+                minAngle.textContent = `${min.toFixed(1)}°`;
+                maxAngle.textContent = `${max.toFixed(1)}°`;
+                romRange.textContent = `${range.toFixed(1)}°`;
+                
+                // Track min/max values for stable results
+                if (isAnalyzing) {
+                    romBuffer.minAngle = Math.min(romBuffer.minAngle, min);
+                    romBuffer.maxAngle = Math.max(romBuffer.maxAngle, max);
+                }
+            }
+            
+            // Check if we should show final results
+            if (isAnalyzing && startTime) {
+                const elapsedTime = (Date.now() - startTime) / 1000; // seconds
+                
+                // Format timer display
+                const minutes = Math.floor(elapsedTime / 60);
+                const seconds = Math.floor(elapsedTime % 60);
+                resultTimer.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                
+                // Check if 30 seconds have passed
+                if (elapsedTime >= 30 && !finalizationTimer) {
+                    finalizeResults();
+                }
+            }
+        }
+        
+        // Finalize and display stable results
+        function finalizeResults() {
+            if (finalizationTimer) {
+                clearTimeout(finalizationTimer);
+            }
+            
+            // Show results container
+            resultsContainer.style.display = 'block';
+            
+            // Calculate stable range
+            const stableRange = romBuffer.maxAngle - romBuffer.minAngle;
+            
+            // Update UI
+            stableMinAngle.textContent = `${romBuffer.minAngle.toFixed(1)}°`;
+            stableMaxAngle.textContent = `${romBuffer.maxAngle.toFixed(1)}°`;
+            stableRomRange.textContent = `${stableRange.toFixed(1)}°`;
+            
+            // Set final result message
+            finalResult.textContent = `${stableRange.toFixed(1)}° Range of Motion`;
+            
+            // Apply rating color based on range
+            if (stableRange >= 60) {
+                finalResult.style.color = '#27ae60'; // Good
+            } else if (stableRange >= 40) {
+                finalResult.style.color = '#f39c12'; // Average
+            } else {
+                finalResult.style.color = '#e74c3c'; // Limited
+            }
+        }
+        
+        // Start camera
+        async function startCamera() {
+            try {
+                mediaStream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { 
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    } 
+                });
+                
+                videoElement.srcObject = mediaStream;
+                videoElement.style.display = 'block';
+                outputCanvas.style.display = 'none';
+                
+                updateStatus('ready');
+            } catch (error) {
+                console.error("Error accessing camera:", error);
+                alert("Could not access camera. Please check permissions.");
+            }
+        }
+        
+        // Start analysis
+        function startAnalysis() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                alert("WebSocket is not connected. Please connect first.");
+                return;
+            }
+            
+            isAnalyzing = true;
+            startTime = Date.now();
+            
+            // Reset result tracking
+            romBuffer = {
+                minAngle: 180,
+                maxAngle: 0
+            };
+            
+            // Hide video, show canvas
+            videoElement.style.display = 'none';
+            outputCanvas.style.display = 'block';
+            
+            // Hide any previous results
+            resultsContainer.style.display = 'none';
+            
+            // Start sending frames
+            startSendingFrames();
+            
+            // Update status
+            updateStatus('analyzing');
+            
+            // Set timer to finalize results after 30 seconds
+            finalizationTimer = setTimeout(() => {
+                finalizeResults();
+            }, 30000);
+        }
+        
+        // Start sending frames to server
+        function startSendingFrames() {
+            if (sendInterval) {
+                clearInterval(sendInterval);
+            }
+            
+            sendInterval = setInterval(() => {
+                if (!isAnalyzing || !ws || ws.readyState !== WebSocket.OPEN) {
+                    stopAnalysis();
+                    return;
+                }
+                
+                const tmpCanvas = document.createElement('canvas');
+                const tmpCtx = tmpCanvas.getContext('2d');
+                
+                tmpCanvas.width = videoElement.videoWidth;
+                tmpCanvas.height = videoElement.videoHeight;
+                
+                tmpCtx.drawImage(videoElement, 0, 0, tmpCanvas.width, tmpCanvas.height);
+                
+                // Compress image before sending
+                const frameData = tmpCanvas.toDataURL('image/jpeg', 0.7);
+                
+                try {
+                    ws.send(frameData);
+                } catch (error) {
+                    console.error("Error sending frame:", error);
+                    stopAnalysis();
+                }
+            }, 100); // 10 FPS
+        }
+        
+        // Stop analysis
+        function stopAnalysis() {
+            isAnalyzing = false;
+            
+            if (sendInterval) {
+                clearInterval(sendInterval);
+                sendInterval = null;
+            }
+            
+            if (finalizationTimer) {
+                clearTimeout(finalizationTimer);
+                finalizationTimer = null;
+            }
+            
+            // If we haven't finalized results yet but have data, do it now
+            if (romBuffer.maxAngle > romBuffer.minAngle && startTime) {
+                finalizeResults();
+            }
+            
+            // Update UI
+            if (mediaStream) {
+                updateStatus('ready');
+                videoElement.style.display = 'block';
+                outputCanvas.style.display = 'none';
+            } else {
+                updateStatus('connected');
+            }
+        }
+        
+        // Stop everything and clean up
+        function stopEverything() {
+            // Stop analysis
+            stopAnalysis();
+            
+            // Stop camera
+            if (mediaStream) {
+                mediaStream.getTracks().forEach(track => track.stop());
+                mediaStream = null;
+            }
+            
+            // Clear video display
+            videoElement.srcObject = null;
+            videoElement.style.display = 'none';
+            outputCanvas.style.display = 'none';
+            
+            // Close WebSocket
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+            
+            // Update status
+            updateStatus('disconnected');
+        }
+        
+        // Event listeners
+        connectBtn.addEventListener('click', connectWebSocket);
+        startBtn.addEventListener('click', startCamera);
+        analyzeBtn.addEventListener('click', startAnalysis);
+        stopBtn.addEventListener('click', stopAnalysis);
+        
+        // Initialize with disconnected status
+        updateStatus('disconnected');
+    </script>
+</body>
+</html>

@@ -1,10 +1,21 @@
-argparse==1.1
-mediapipe==0.8.10.1
-numpy==1.21.5
-opencv-python==4.6.0.66
-Pillow==9.0.1
-pytest
-fastapi
-uvicorn
-opencv-python-headless
-numpy
+# Core dependencies
+fastapi==0.104.1
+uvicorn==0.23.2
+pydantic==2.4.2
+python-multipart==0.0.6
+websockets==11.0.3
+httpx==0.25.0
+
+# Computer vision
+opencv-python-headless==4.8.1.78
+mediapipe==0.10.7
+numpy==1.24.3
+
+# Optional dependencies
+Pillow==10.0.1
+matplotlib==3.7.3
+pytest==7.4.0
+
+# Deployment
+gunicorn==21.2.0
+python-dotenv==1.0.0
