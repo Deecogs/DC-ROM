@@ -29,7 +29,10 @@ RUN mkdir -p /app/api /app/rom /app/utils /app/static /app/templates
 COPY requirements.txt .
 
 # Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt && \
+    # Fix permissions for MediaPipe model files
+    find /usr/local/lib/python3.10/site-packages/mediapipe -name "*.tflite" -exec chmod 644 {} \; && \
+    find /usr/local/lib/python3.10/site-packages/mediapipe -type d -exec chmod 755 {} \;
 
 # Copy application code
 COPY api/ /app/api/
