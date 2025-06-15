@@ -1,0 +1,11 @@
+{
+  "frame_id": 0,
+  "timestamp": 0.0,
+  "processing_time_ms": 33.66,
+  "persons": [],
+  "frame_metrics": {
+    "detected_persons": 0,
+    "average_confidence": 0.0,
+    "processing_fps": 29.7
+  }
+}

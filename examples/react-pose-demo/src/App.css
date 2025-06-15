@@ -1,0 +1,136 @@
+.App {
+  text-align: center;
+  min-height: 100vh;
+  background-color: #f0f2f5;
+}
+
+.App-header {
+  background-color: #282c34;
+  padding: 20px;
+  color: white;
+}
+
+.App-header h1 {
+  margin: 0;
+  font-size: 2em;
+}
+
+.controls {
+  padding: 20px;
+  background-color: white;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.mode-selector {
+  display: flex;
+  gap: 10px;
+}
+
+.mode-selector button {
+  padding: 10px 20px;
+  border: 2px solid #282c34;
+  background-color: white;
+  color: #282c34;
+  cursor: pointer;
+  border-radius: 5px;
+  font-size: 16px;
+  transition: all 0.3s;
+}
+
+.mode-selector button:hover {
+  background-color: #f0f2f5;
+}
+
+.mode-selector button.active {
+  background-color: #282c34;
+  color: white;
+}
+
+.file-input input[type="file"] {
+  display: none;
+}
+
+.file-input button,
+.webcam-controls button {
+  padding: 10px 20px;
+  background-color: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: background-color 0.3s;
+}
+
+.file-input button:hover,
+.webcam-controls button:hover {
+  background-color: #45a049;
+}
+
+.webcam-controls button {
+  background-color: #f44336;
+}
+
+.webcam-controls button:hover {
+  background-color: #da190b;
+}
+
+.error {
+  color: #f44336;
+  padding: 10px;
+  background-color: #ffebee;
+  border-radius: 5px;
+  margin: 10px auto;
+  max-width: 600px;
+}
+
+.processing {
+  color: #2196F3;
+  padding: 10px;
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.display-area {
+  padding: 20px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 500px;
+}
+
+.output-canvas {
+  max-width: 100%;
+  max-height: 80vh;
+  border: 2px solid #ddd;
+  border-radius: 5px;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+  background-color: black;
+}
+
+.results {
+  padding: 20px;
+  background-color: white;
+  margin: 20px auto;
+  max-width: 600px;
+  border-radius: 5px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  text-align: left;
+}
+
+.results h3 {
+  margin-top: 0;
+  color: #282c34;
+}
+
+.results pre {
+  background-color: #f5f5f5;
+  padding: 10px;
+  border-radius: 5px;
+  overflow-x: auto;
+}

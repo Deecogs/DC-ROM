@@ -1,0 +1,31 @@
+[base]
+pose_model = "mediapipe"
+max_persons_to_detect = 5
+person_ordering_method = "highest_likelihood"
+
+[detection]
+min_detection_confidence = 0.5
+min_tracking_confidence = 0.5
+keypoint_likelihood_threshold = 0.3
+average_likelihood_threshold = 0.5
+keypoint_number_threshold = 0.3
+
+[angles]
+calculate_joint_angles = true
+calculate_segment_angles = true
+flip_left_right = true
+
+[processing]
+interpolate = true
+interpolation_gap_size = 10
+filter_type = "butterworth"
+
+[butterworth]
+order = 4
+cutoff_frequency = 6.0
+
+[gaussian]
+sigma = 1.0
+
+[median]
+kernel_size = 3
